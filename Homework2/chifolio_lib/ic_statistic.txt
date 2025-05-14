@@ -1,0 +1,10 @@
+Signature: ic_statistic(ic)
+Docstring: <no docstring>
+Source:   
+def ic_statistic(ic):
+    res = pd.Series({'IC': ic.mean(), 'ICSTD': ic.std(), 
+                     'IR': ic.mean()/ic.std(), 
+                     'T': stats.ttest_1samp(ic.dropna(),0).statistic})
+    return res
+File:      d:\software\anaconda3\envs\python3.9\lib\site-packages\chifolio\factor\icir.py
+Type:      function

@@ -1,0 +1,173 @@
+Init signature: Backtest(returns, portfolio, cost=0)
+Docstring:      <no docstring>
+Source:        
+class Backtest(object):
+
+    def __init__(self, returns, portfolio, cost=0):
+        self.returns = returns
+        self.portfolio = portfolio
+        self.cost = cost
+        self.account = {}
+ 
+    def run(self):
+        cost = self.cost
+        ret = self.returns
+        cumret = (1 + ret).cumprod()
+        portfolio = self.portfolio
+        calendar = ret.index.sort_values()
+        
+        wealth = 1
+        holding = pd.Series()
+        equity = pd.Series()
+        position = pd.Series()
+        
+        wealth_dict = OrderedDict()  # account net asset value
+        holding_dict = OrderedDict() # holding volume of each asset
+        equity_dict = OrderedDict()  # equity value of each asset
+        position_dict = OrderedDict()# position ratio of each asset
+        turnover_dict = OrderedDict()
+        cost_ratio_dict = OrderedDict()
+        
+        for i, dt in enumerate(calendar):
+            p = cumret.loc[dt]
+            target = portfolio.get(dt)
+
+            # none rebalance date
+            if (not holding.empty) and (target is None):
+                equity = holding * p
+                position = equity / equity.sum() 
+                wealth = equity.sum()
+
+                #wealth_dict[dt] = wealth
+                holding_dict[dt] = holding
+                equity_dict[dt] = equity
+                position_dict[dt] = position
+            
+            # rebalance date
+            if target is not None:
+                # before rebalance
+                equity = holding * p
+                if not holding.empty:
+                    wealth = equity.sum() 
+                position = equity / equity.sum(skipna=False)
+
+                #wealth_dict[dt] = wealth
+                holding_dict[dt] = holding
+                equity_dict[dt] = equity
+                position_dict[dt] = position
+                
+                # turnover(one way)
+                diff = target.sub(position, fill_value=0)
+                turnover = abs(diff).sum() * 0.5
+                turnover_dict[dt] = turnover
+
+                # commission fee and slippage
+                total_cost = wealth * turnover * 2 * cost
+                cost_ratio_dict[dt] = total_cost / wealth
+                
+                holding = (wealth - total_cost) * target / p                
+
+
+            wealth_dict[dt] = wealth
+
+                                
+        self.account['wealth'] = wealth_dict
+        self.account['holding'] = holding_dict
+        self.account['equity'] = equity_dict
+        self.account['position'] = position_dict
+        self.account['turnover'] = turnover_dict
+        self.account['cost_ratio'] = cost_ratio_dict
+ 
+        nav = pd.Series(wealth_dict)
+        
+        return nav
+    
+#    def run_long_short(self):
+#        cost = self.cost
+#        ret = self.returns
+#        portfolio = self.portfolio
+#        calendar = ret.index.sort_values()
+#
+#        wealth = 1        
+#        signal = 0
+#        wealth_dict = OrderedDict()  # account net asset value
+#        
+#        for i, dt in enumerate(calendar):
+#            
+#            if signal == 0:
+#                wealth = wealth * (1 + 0)
+#            elif signal == 1:
+#                wealth = wealth * (1 + ret.loc[dt])
+#            elif signal == -1:
+#                wealth = wealth * (1 - ret.loc[dt])
+#
+#            wealth_dict[dt] = wealth
+#
+#            # refresh
+#            newsignal = portfolio.get(dt)  
+#            if newsignal is not None:
+#                signal = newsignal
+#
+#        nav = pd.Series(wealth_dict)
+#        
+#        return nav
+    
+    def run_long_short(self):
+        cost = self.cost
+        ret = self.returns
+        portfolio = self.portfolio
+        calendar = ret.index.sort_values()
+
+        wealth = 1        
+        signal = 0
+        wealth_dict = OrderedDict()  # account net asset value
+
+        cumret = 1
+        winloss = []
+        
+        for i, dt in enumerate(calendar):
+            
+            if signal == 0:
+                wealth = wealth * (1 + 0)
+            elif signal == 1:
+                cumret = cumret * (1 + ret.loc[dt])
+                wealth = wealth * (1 + ret.loc[dt])
+            elif signal == -1:
+                cumret = cumret * (1 - ret.loc[dt])
+                wealth = wealth * (1 - ret.loc[dt])
+
+            wealth_dict[dt] = wealth
+
+            # refresh
+            newsignal = portfolio.get(dt)  
+            if newsignal is not None:
+                # 开多
+                if (signal == 0) & (newsignal == 1):
+                    cumret = 1
+                # 开空
+                elif (signal == 0) & (newsignal == -1):
+                    cumret = 1
+                # 平多开空
+                elif (signal == 1) & (newsignal == -1):
+                    winloss.append(cumret)
+                    cumret = 1
+                # 平多
+                elif (signal == 1) & (newsignal == 0):
+                    winloss.append(cumret)
+                # 平空开多
+                elif (signal == -1) & (newsignal == 1):
+                    winloss.append(cumret)
+                    cumret = 1
+                # 平空
+                elif (signal == -1) & (newsignal == 0):
+                    winloss.append(cumret)
+                
+                signal = newsignal           
+
+        self.winloss = winloss
+        nav = pd.Series(wealth_dict)
+        
+        return nav
+File:           d:\software\anaconda3\envs\python3.9\lib\site-packages\chifolio\backtest\backtest.py
+Type:           type
+Subclasses:     
